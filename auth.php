@@ -45,6 +45,7 @@ class auth_plugin_jwt_sso extends auth_plugin_base {
      */
     public function __construct() {
         $this->authtype = 'jwt_sso';
+        $this->config = get_config('auth_jwt_sso');
     }
 
     /**
@@ -66,23 +67,70 @@ class auth_plugin_jwt_sso extends auth_plugin_base {
      * We attempt to auto log the user in, or redirect to the alternative login page.
      */
     public function loginpage_hook() {
-        global $CFG;
+        global $user;
+        global $CFG, $SESSION;
 
-        $signed_jwt = optional_param('sjwt', 0, PARAM_TEXT);
         $redirect = optional_param('redirect', 1, PARAM_INT);
+        $username = optional_param('username', '', PARAM_RAW);
+
+
+        if ($redirect == 1){
+            $SESSION->nologinredirect = null;
+        }
+
+        if ($redirect == 0 || (isset($SESSION->nologinredirect) && !$SESSION->nologinredirect)) {
+            // Login page can redirect back to itself without parameters when there is an error message, e.g. session timeout.
+            // Remember the redirect = 0 paramater accross this redirect using this custom session var.
+            $SESSION->nologinredirect = true;
+            return;
+        }
+        // If the username is set for the form, we will not validate or redirect.
+        if (!empty($username) || isloggedin()) {
+            return;
+        }
 
         if (!function_exists('mcrypt_module_open')) {
-            debugging(get_string('mcrypt_not_installed', 'auth_jwt_cookie'), DEBUG_ALL);
+            debugging(get_string('mcrypt_not_installed', 'auth_jwt_sso'), DEBUG_ALL);
             return;
         }
 
-        // Let's verify the JWT.
-        $valid_jwt = $this->verify_jwt($signed_jwt);
-        if(!$valid_jwt){
-            return;
+        if($this->config->use_cookie || !isset($this->config->jwt_name)){
+            $valid_jwt = $this->verify_cookie();
+        }else if($this->config->jwt_name){
+            $signed_jwt = optional_param($this->config->jwt_name, 0, PARAM_TEXT);
+            // Let's verify the JWT.
+            $valid_jwt = $this->verify_jwt($signed_jwt);
+            if(!$valid_jwt){
+                return;
+            }
         }
+
+
 
         $user = $this->verify_user($valid_jwt);
+
+        // JWT was not verified
+        //if ($id === false || ($user = $this->verify_user($userdata)) !== false) {.
+        if (($user) === false || $user ==null) {
+
+            // Set the alternative login url to ours if it's not already set by a higher.
+            // priority plugin.
+            if (!empty($this->config->shared_login_url) && empty($CFG->alternateloginurl)) {
+                $CFG->alternateloginurl = $this->config->shared_login_url;
+                redirect($this->config->shared_login_url);
+            }
+            return;
+        }
+
+        // A valid cookie was found, but not a valid user.  Assume a login without an account.
+        if ($user !== false && $user === null) {
+            if (!empty($this->config->no_account_url) && empty($CFG->alternateloginurl)) {
+                // Defined no user URL, send the person there via redirect.
+                $CFG->alternateloginurl = $this->config->no_account_url;
+                redirect($this->config->shared_login_url);
+            }
+            return;
+        }
 
         //Complete the login here.
         if ($user !== false && $user != null) {
@@ -93,8 +141,6 @@ class auth_plugin_jwt_sso extends auth_plugin_base {
                 //do nothing
             }
 
-        }else{
-            return;
         }
     }
 
@@ -198,4 +244,68 @@ class auth_plugin_jwt_sso extends auth_plugin_base {
         }
     }
 
+    /**
+     * Verify a cookie we have recieved and determine the user it belongs to.
+     *
+     * @return integer|bool If the cookie was valid return the id, false otherwise.
+     */
+    protected function verify_cookie() {
+
+        if (!isset($_COOKIE[$this->config->cookie_name])) {
+            return false;
+        }
+
+        // The cookie can be encoded incorrectly with spaces instead of +'s in URL enoding.
+        $string = $_COOKIE[$this->config->cookie_name];
+        $userdata = $this->decrypt_cookie($string);
+
+        return $userdata;
+
+    }
+
+    /**
+     * Decrypts cookie
+     */
+    public function decrypt_cookie($input) {
+
+        $secretKey = ($this->config->secret);
+
+        try{
+            $signer = new HS256($secretKey);
+            $parser = new JwtParser($signer);
+            $claims = $parser->parse($input);
+        }catch(Exception $e){
+            return array();
+        }
+        return $claims;
+    }
+
+    /**
+     * Upon logout remove the cookie to ensure we won't automatically log back in.
+     */
+    function logoutpage_hook() {
+        global $USER;
+
+        if ($USER->auth === $this->authtype){
+            setcookie($this->config->cookie_name, null, time() - (86400 * 30), '/', $this->config->shared_cookie_domain);
+            unset($_COOKIE[$this->config->cookie_name]);
+        }
+    }
+
+    /**
+     * Determine the url (if any) to send the user to after logout.
+     *
+     * @param stdClass $user The user record just prior to logout.
+     */
+    public function postlogout_hook($user) {
+        global $redirect;  // This is used to completed a redirect after a user has logged out.
+
+        // Only do this if the user is actually logged in via jwt_cookie.
+        if ($user->auth === $this->authtype) {
+            // Check if there is an alternative logout url defined
+            if (isset($this->config->logout_url) && !empty($this->config->logout_url)) {
+                $redirect = $this->config->logout_url;
+            }
+        }
+    }
 }
