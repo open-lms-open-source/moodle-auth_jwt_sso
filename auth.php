@@ -257,27 +257,10 @@ class auth_plugin_jwt_sso extends auth_plugin_base {
 
         // The cookie can be encoded incorrectly with spaces instead of +'s in URL enoding.
         $string = $_COOKIE[$this->config->cookie_name];
-        $userdata = $this->decrypt_cookie($string);
+        $userdata = $this->decrypt_jwt($string);
 
         return $userdata;
 
-    }
-
-    /**
-     * Decrypts cookie
-     */
-    public function decrypt_cookie($input) {
-
-        $secretKey = ($this->config->secret);
-
-        try{
-            $signer = new HS256($secretKey);
-            $parser = new JwtParser($signer);
-            $claims = $parser->parse($input);
-        }catch(Exception $e){
-            return array();
-        }
-        return $claims;
     }
 
     /**
