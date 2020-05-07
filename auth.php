@@ -122,7 +122,7 @@ class auth_plugin_jwt_sso extends auth_plugin_base {
             return;
         }
 
-        // A valid cookie was found, but not a valid user.  Assume a login without an account.
+        // A valid jwt was found, but not a valid user.  Assume a login without an account.
         if ($user !== false && $user === null) {
             if (!empty($this->config->no_account_url) && empty($CFG->alternateloginurl)) {
                 // Defined no user URL, send the person there via redirect.
@@ -136,7 +136,11 @@ class auth_plugin_jwt_sso extends auth_plugin_base {
         if ($user !== false && $user != null) {
             try {
                 complete_user_login($user);
-                redirect($CFG->wwwroot .'/my');
+                if(!empty($this->config->post_login_url)){
+                    redirect($CFG->wwwroot . $this->config->post_login_url);
+                }else{
+                    redirect($CFG->wwwroot .'/my');
+                }
             } catch (Exception $e) {
                 //do nothing
             }
@@ -173,6 +177,9 @@ class auth_plugin_jwt_sso extends auth_plugin_base {
         global $CFG;
 
         $secretKey = ($CFG->jwtssosecret);
+        if($this->config>secret_encoded){
+            $secretKey = base64_decode($secretKey);
+        }
 
         try{
             $signer = new HS256($secretKey);
