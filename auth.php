@@ -136,8 +136,9 @@ class auth_plugin_jwt_sso extends auth_plugin_base {
         if ($user !== false && $user != null) {
             try {
                 complete_user_login($user);
-                if(!empty($this->config->post_login_url)){
-                    redirect($CFG->wwwroot . $this->config->post_login_url);
+                $urltogo = core_login_get_return_url();
+                if($urltogo){
+                    redirect($urltogo);
                 }else{
                     redirect($CFG->wwwroot .'/my');
                 }
