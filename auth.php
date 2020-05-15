@@ -158,7 +158,7 @@ class auth_plugin_jwt_sso extends auth_plugin_base {
         $valid = false;
 
         // Check if the site actually has the secret set.
-        if(!$CFG->jwtssosecret){
+        if(!$this->config->secret){
             return $valid;
         }
 
@@ -178,7 +178,7 @@ class auth_plugin_jwt_sso extends auth_plugin_base {
         global $CFG;
 
         $secretKey = ($CFG->jwtssosecret);
-        if($this->config>secret_encoded){
+        if($this->config->secret_encoded){
             $secretKey = base64_decode($secretKey);
         }
 
