@@ -177,7 +177,7 @@ class auth_plugin_jwt_sso extends auth_plugin_base {
     protected function decrypt_jwt($signed_jwt){
         global $CFG;
 
-        $secretKey = ($CFG->jwtssosecret);
+        $secretKey = ($this->config->secret);
         if($this->config->secret_encoded){
             $secretKey = base64_decode($secretKey);
         }
