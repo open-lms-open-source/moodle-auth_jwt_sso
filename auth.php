@@ -30,8 +30,7 @@ require_once($CFG->libdir . '/moodlelib.php');
 require_once($CFG->dirroot . '/auth/jwt_sso/lib/jwt/vendor/autoload.php');
 require_once($CFG->dirroot . '/user/lib.php');
 
-use MiladRahimi\Jwt\Cryptography\Algorithms\Hmac\HS256;
-use MiladRahimi\Jwt\JwtParser;
+use Firebase\JWT\JWT;
 
 
 /**
@@ -89,11 +88,6 @@ class auth_plugin_jwt_sso extends auth_plugin_base {
             return;
         }
 
-        if (!function_exists('mcrypt_module_open')) {
-            debugging(get_string('mcrypt_not_installed', 'auth_jwt_sso'), DEBUG_ALL);
-            return;
-        }
-
         if($this->config->use_cookie || !isset($this->config->jwt_name)){
             $valid_jwt = $this->verify_cookie();
         }else if($this->config->jwt_name){
@@ -104,8 +98,6 @@ class auth_plugin_jwt_sso extends auth_plugin_base {
                 return;
             }
         }
-
-
 
         $user = $this->verify_user($valid_jwt);
 
@@ -158,7 +150,7 @@ class auth_plugin_jwt_sso extends auth_plugin_base {
         $valid = false;
 
         // Check if the site actually has the secret set.
-        if(!$CFG->jwtssosecret){
+        if(!$this->config->secret){
             return $valid;
         }
 
@@ -175,17 +167,15 @@ class auth_plugin_jwt_sso extends auth_plugin_base {
      * This function will decrypt the JWT
      */
     protected function decrypt_jwt($signed_jwt){
-        global $CFG;
 
-        $secretKey = ($CFG->jwtssosecret);
-        if($this->config>secret_encoded){
+        $secretKey = ($this->config->secret);
+        if($this->config->secret_encoded){
             $secretKey = base64_decode($secretKey);
         }
 
         try{
-            $signer = new HS256($secretKey);
-            $parser = new JwtParser($signer);
-            $claims = $parser->parse($signed_jwt);
+            $claims = JWT::decode($signed_jwt, $secretKey, array('HS256'));
+            $claims = (array) $claims;
         }catch(Exception $e){
             return false;
         }
@@ -200,7 +190,7 @@ class auth_plugin_jwt_sso extends auth_plugin_base {
     {
         global $DB;
 
-        if($userdata){
+        if($userdata && isset($userdata['username'])){
             $user = $DB->get_record('user', array('username' => $userdata['username']));
 
             $newuser = false;
@@ -234,7 +224,7 @@ class auth_plugin_jwt_sso extends auth_plugin_base {
 
         $update = false;
         // Update the user fields.
-        $allowed_fields = array('firstname', 'lastname', 'description', 'email');
+        $allowed_fields = array('firstname', 'lastname', 'description', 'email', 'username');
         foreach ($allowed_fields as $field){
             if(isset($userdata[$field])) {
                 $user->{$field} = $userdata[$field];

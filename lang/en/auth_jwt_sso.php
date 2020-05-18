@@ -65,5 +65,3 @@ $string['encryption_method_description'] = 'Encryption method used for payload';
 $string['HS256'] = 'HS256';
 $string['secret_encoded'] = 'Secret is base64 encoded';
 $string['secret_encoded_description'] = 'Secret is base64 encoded';
-$string['post_login_url'] = 'Post-login URL';
-$string['post_login_url_description'] = 'URL to redirect to after user logs in';
