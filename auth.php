@@ -61,6 +61,36 @@ class auth_plugin_jwt_sso extends auth_plugin_base {
         return false;
     }
 
+    public function pre_loginpage_hook() {
+        global $SESSION;
+
+        $incoming_url = $SESSION->wantsurl;
+
+        $valid_jwt = false;
+        // Check for cookie.
+        if($this->config->use_cookie || !isset($this->config->jwt_name)){
+            $valid_jwt = $this->verify_cookie();
+        }else if($this->config->jwt_name){
+            $signed_jwt = optional_param($this->config->jwt_name, 0, PARAM_TEXT);
+            // Let's verify the JWT.
+            $valid_jwt = $this->verify_jwt($signed_jwt);
+            if(!$valid_jwt){
+                return;
+            }
+        }
+        if($valid_jwt) {
+
+            $user = $this->verify_user($valid_jwt);
+            //Try to finish the user login.
+            $this->finishUserLogin($user, $incoming_url);
+
+        } else {
+            $this->loginpage_hook();
+        }
+        $this->loginpage_hook();
+    }
+
+
     /**
      * When the login page for moodle has been requested, run this function.
      * We attempt to auto log the user in, or redirect to the alternative login page.
@@ -83,6 +113,7 @@ class auth_plugin_jwt_sso extends auth_plugin_base {
             $SESSION->nologinredirect = true;
             return;
         }
+
         // If the username is set for the form, we will not validate or redirect.
         if (!empty($username) || isloggedin()) {
             return;
@@ -100,9 +131,15 @@ class auth_plugin_jwt_sso extends auth_plugin_base {
         }
 
         $user = $this->verify_user($valid_jwt);
+        // Let's try to finish the login process.
+        if($user){
+            $this->finishUserLogin($user);
+        }
+    }
 
-        // JWT was not verified
-        //if ($id === false || ($user = $this->verify_user($userdata)) !== false) {.
+    protected function finishUserLogin($user, $incoming_url = ""){
+        global $CFG;
+        // JWT was not verified.
         if (($user) === false || $user ==null) {
 
             // Set the alternative login url to ours if it's not already set by a higher.
@@ -126,18 +163,26 @@ class auth_plugin_jwt_sso extends auth_plugin_base {
 
         //Complete the login here.
         if ($user !== false && $user != null) {
-            try {
-                complete_user_login($user);
-                $urltogo = core_login_get_return_url();
-                if($urltogo){
-                    redirect($urltogo);
-                }else{
-                    redirect($CFG->wwwroot .'/my');
+            if(!empty($incoming_url)){
+                try {
+                    complete_user_login($user);
+                    redirect($incoming_url);
+                } catch (Exception $e) {
+                    //do nothing
                 }
-            } catch (Exception $e) {
-                //do nothing
+            }else{
+                try {
+                    complete_user_login($user);
+                    $urltogo = core_login_get_return_url();
+                    if($urltogo){
+                        redirect($urltogo);
+                    }else{
+                        redirect($CFG->wwwroot .'/my');
+                    }
+                } catch (Exception $e) {
+                    //do nothing
+                }
             }
-
         }
     }
 
