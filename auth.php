@@ -177,7 +177,7 @@ class auth_plugin_jwt_sso extends auth_plugin_base {
                     if($urltogo){
                         redirect($urltogo);
                     }else{
-                        redirect($CFG->wwwroot .'/my');
+                        redirect($CFG->wwwroot);
                     }
                 } catch (Exception $e) {
                     //do nothing
