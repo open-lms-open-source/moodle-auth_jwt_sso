@@ -177,7 +177,7 @@ class auth_plugin_jwt_sso extends auth_plugin_base {
                     if($urltogo){
                         redirect($urltogo);
                     }else{
-                        redirect($CFG->wwwroot .'/my');
+                        redirect($CFG->wwwroot);
                     }
                 } catch (Exception $e) {
                     //do nothing
@@ -331,6 +331,7 @@ class auth_plugin_jwt_sso extends auth_plugin_base {
             // Check if there is an alternative logout url defined
             if (isset($this->config->logout_url) && !empty($this->config->logout_url)) {
                 $redirect = $this->config->logout_url;
+                redirect($this->config->logout_url);
             }
         }
     }
