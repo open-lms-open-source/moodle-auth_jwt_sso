@@ -96,22 +96,13 @@ class auth_plugin_jwt_sso extends auth_plugin_base {
      * We attempt to auto log the user in, or redirect to the alternative login page.
      */
     public function loginpage_hook() {
-        global $user;
-        global $CFG, $SESSION;
+        global $user, $SESSION;
 
-        $redirect = optional_param('redirect', 1, PARAM_INT);
+        $redirect = optional_param('redirect', 1, PARAM_URL);
         $username = optional_param('username', '', PARAM_RAW);
-
 
         if ($redirect == 1){
             $SESSION->nologinredirect = null;
-        }
-
-        if ($redirect == 0 || (isset($SESSION->nologinredirect) && !$SESSION->nologinredirect)) {
-            // Login page can redirect back to itself without parameters when there is an error message, e.g. session timeout.
-            // Remember the redirect = 0 paramater accross this redirect using this custom session var.
-            $SESSION->nologinredirect = true;
-            return;
         }
 
         // If the username is set for the form, we will not validate or redirect.
@@ -125,15 +116,35 @@ class auth_plugin_jwt_sso extends auth_plugin_base {
             $signed_jwt = optional_param($this->config->jwt_name, 0, PARAM_TEXT);
             // Let's verify the JWT.
             $valid_jwt = $this->verify_jwt($signed_jwt);
-            if(!$valid_jwt){
-                return;
+        }
+
+        if(!$valid_jwt){
+            if (!empty($this->config->shared_login_url)) {
+                if(isset($this->config->redirect_url_name)){
+                    $urltogo = core_login_get_return_url();
+                    redirect($this->config->shared_login_url. "&" .$this->config->redirect_url_name . "=" . $urltogo);
+                }else{
+                    redirect($this->config->shared_login_url);
+                }
             }
+            return;
         }
 
         $user = $this->verify_user($valid_jwt);
+
         // Let's try to finish the login process.
         if($user){
-            $this->finishUserLogin($user);
+            $this->finishUserLogin($user, $redirect);
+        }else{
+            // Redirect to the shared login URL if the user can't be logged in.
+            if (!empty($this->config->shared_login_url)) {
+                if(isset($this->config->redirect_url_name)){
+                    $urltogo = core_login_get_return_url();
+                    redirect($this->config->shared_login_url. "&" .$this->config->redirect_url_name . "=" . $urltogo);
+                }else{
+                    redirect($this->config->shared_login_url);
+                }
+            }
         }
     }
 
@@ -144,19 +155,26 @@ class auth_plugin_jwt_sso extends auth_plugin_base {
 
             // Set the alternative login url to ours if it's not already set by a higher.
             // priority plugin.
-            if (!empty($this->config->shared_login_url) && empty($CFG->alternateloginurl)) {
-                $CFG->alternateloginurl = $this->config->shared_login_url;
-                redirect($this->config->shared_login_url);
+            if (!empty($this->config->shared_login_url)) {
+                if(isset($this->config->redirect_url_name)){
+                    $urltogo = core_login_get_return_url();
+                    redirect($this->config->shared_login_url. "&" .$this->config->redirect_url_name . "=" . $urltogo);
+                }else{
+                    redirect($this->config->shared_login_url);
+                }
             }
             return;
         }
 
         // A valid jwt was found, but not a valid user.  Assume a login without an account.
         if ($user !== false && $user === null) {
-            if (!empty($this->config->no_account_url) && empty($CFG->alternateloginurl)) {
-                // Defined no user URL, send the person there via redirect.
-                $CFG->alternateloginurl = $this->config->no_account_url;
-                redirect($this->config->shared_login_url);
+            if (!empty($this->config->shared_login_url)) {
+                if(isset($this->config->redirect_url_name)){
+                    $urltogo = core_login_get_return_url();
+                    redirect($this->config->shared_login_url. "&" .$this->config->redirect_url_name . "=" . $urltogo);
+                }else{
+                    redirect($this->config->shared_login_url);
+                }
             }
             return;
         }
@@ -190,7 +208,6 @@ class auth_plugin_jwt_sso extends auth_plugin_base {
      * This attempts to parse the JWT from the URL
      */
     protected function verify_jwt($signed_jwt){
-        global $CFG;
 
         $valid = false;
 
@@ -236,11 +253,22 @@ class auth_plugin_jwt_sso extends auth_plugin_base {
         global $DB;
 
         if($userdata && isset($userdata['username'])){
+
+            $userdata = (array)$userdata;
+            if ($this->config->userdatamapper != ""){
+                $userdata = (array)json_decode($userdata[$this->config->userdatamapper]);
+            }
+            $uniqueid = $this->config->useruniqueid;
+
+            if(!empty($uniqueid)){
+                $userdata['uniqueid'] = $userdata[$uniqueid];
+            }
+
             $user = $DB->get_record('user', array('username' => $userdata['username']));
 
             $newuser = false;
             if(!$user){
-                $user = create_user_record($userdata['username'], '', $this->authtype);
+                $user = create_user_record($userdata['uniqueid'], '', $this->authtype);
                 $newuser = true;
             }
 
@@ -266,14 +294,32 @@ class auth_plugin_jwt_sso extends auth_plugin_base {
 
     public function update_user_profile_fields(&$user, $userdata, $newuser = false) {
         global $CFG;
-
+        $mapconfig = $this->config;
+        $allkeys = array_keys(get_object_vars($mapconfig));
         $update = false;
-        // Update the user fields.
-        $allowed_fields = array('firstname', 'lastname', 'description', 'email', 'username');
-        foreach ($allowed_fields as $field){
-            if(isset($userdata[$field])) {
-                $user->{$field} = $userdata[$field];
-                $update = true;
+
+        foreach ($allkeys as $key) {
+            if (preg_match('/^field_updatelocal_(.+)$/', $key, $match)) {
+                $field = $match[1];
+
+                if (!empty($mapconfig->{'field_map_'.$field})) {
+
+                    $attr = $mapconfig->{'field_map_'.$field};
+                    $updateonlogin = $mapconfig->{'field_updatelocal_'.$field} === 'onlogin';
+
+                    if ($newuser || $updateonlogin) {
+
+                        // Basic error handling, check to see if the attributes exist before mapping the data.
+                        if ($userdata) {
+                            if(!empty($userdata[$attr])){
+                                $user->{$field} = $userdata[$attr];
+                                $update = true;
+                                // Custom profile fields have the prefix profile_field_ and will be saved as profile field data.
+                            }
+
+                        }
+                    }
+                }
             }
         }
 

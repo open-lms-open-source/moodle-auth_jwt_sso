@@ -23,5 +23,20 @@ if ($ADMIN->fulltree) {
         get_string('jwt_name_description', 'auth_jwt_sso'), ''));
     $settings->add(new admin_setting_configtext('auth_jwt_sso/shared_cookie_domain', get_string('shared_cookie_domain', 'auth_jwt_sso'),
         get_string('shared_cookie_domain_description', 'auth_jwt_sso'), ''));
+    $settings->add(new admin_setting_configtext('auth_jwt_sso/redirect_url_name', get_string('redirect_url_name', 'auth_jwt_sso'),
+        get_string('redirect_url_name_description', 'auth_jwt_sso'), ''));
 
+    $options = array(
+        'username' => get_string('username', 'auth_jwt_sso'),
+        'email' => get_string('email', 'auth_jwt_sso'),
+        'idnumber' => get_string('idnumber', 'auth_jwt_sso'),
+    );
+    $settings->add(new admin_setting_configselect('auth_jwt_sso/useruniquemoodleid',
+        get_string('useruniqueid', 'auth_jwt_sso'),
+        get_string('useruniqueid_description', 'auth_jwt_sso'), '', $options));
+
+    $authplugin = get_auth_plugin('jwt_sso');
+
+    display_auth_lock_options($settings, $authplugin->authtype, $authplugin->userfields, get_string('auth_fieldlocks_help', 'auth'),
+        true, true, $authplugin->get_custom_user_profile_fields());
 }

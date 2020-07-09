@@ -65,3 +65,5 @@ $string['encryption_method_description'] = 'Encryption method used for payload';
 $string['HS256'] = 'HS256';
 $string['secret_encoded'] = 'Secret is base64 encoded';
 $string['secret_encoded_description'] = 'Secret is base64 encoded';
+$string['redirect_url_name'] = 'Redirect Parameter Name';
+$string['redirect_url_name_description'] = 'Name for url parameter that the Moodle URL can be redirected to upon login';
