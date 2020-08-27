@@ -122,7 +122,7 @@ class auth_plugin_jwt_sso extends auth_plugin_base {
             if (!empty($this->config->shared_login_url)) {
                 if(isset($this->config->redirect_url_name)){
                     $urltogo = core_login_get_return_url();
-                    redirect($this->config->shared_login_url. "&" .$this->config->redirect_url_name . "=" . $urltogo);
+                    redirect($this->config->shared_login_url. "?" .$this->config->redirect_url_name . "=" . $urltogo);
                 }else{
                     redirect($this->config->shared_login_url);
                 }
@@ -140,7 +140,7 @@ class auth_plugin_jwt_sso extends auth_plugin_base {
             if (!empty($this->config->shared_login_url)) {
                 if(isset($this->config->redirect_url_name)){
                     $urltogo = core_login_get_return_url();
-                    redirect($this->config->shared_login_url. "&" .$this->config->redirect_url_name . "=" . $urltogo);
+                    redirect($this->config->shared_login_url. "?" .$this->config->redirect_url_name . "=" . $urltogo);
                 }else{
                     redirect($this->config->shared_login_url);
                 }
@@ -158,7 +158,7 @@ class auth_plugin_jwt_sso extends auth_plugin_base {
             if (!empty($this->config->shared_login_url)) {
                 if(isset($this->config->redirect_url_name)){
                     $urltogo = core_login_get_return_url();
-                    redirect($this->config->shared_login_url. "&" .$this->config->redirect_url_name . "=" . $urltogo);
+                    redirect($this->config->shared_login_url. "?" .$this->config->redirect_url_name . "=" . $urltogo);
                 }else{
                     redirect($this->config->shared_login_url);
                 }
@@ -171,7 +171,7 @@ class auth_plugin_jwt_sso extends auth_plugin_base {
             if (!empty($this->config->shared_login_url)) {
                 if(isset($this->config->redirect_url_name)){
                     $urltogo = core_login_get_return_url();
-                    redirect($this->config->shared_login_url. "&" .$this->config->redirect_url_name . "=" . $urltogo);
+                    redirect($this->config->shared_login_url. "?" .$this->config->redirect_url_name . "=" . $urltogo);
                 }else{
                     redirect($this->config->shared_login_url);
                 }
