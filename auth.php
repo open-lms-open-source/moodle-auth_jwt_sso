@@ -29,6 +29,8 @@ require_once($CFG->libdir . '/authlib.php');
 require_once($CFG->libdir . '/moodlelib.php');
 require_once($CFG->dirroot . '/auth/jwt_sso/lib/jwt/vendor/autoload.php');
 require_once($CFG->dirroot . '/user/lib.php');
+require_once($CFG->dirroot . '/login/lib.php');
+require __DIR__ . '/vendor/autoload.php';
 
 use Firebase\JWT\JWT;
 
@@ -78,8 +80,8 @@ class auth_plugin_jwt_sso extends auth_plugin_base {
                 return;
             }
         }
-        if($valid_jwt) {
 
+        if($valid_jwt) {
             $user = $this->verify_user($valid_jwt);
             //Try to finish the user login.
             $this->finishUserLogin($user, $incoming_url);
@@ -96,7 +98,7 @@ class auth_plugin_jwt_sso extends auth_plugin_base {
      * We attempt to auto log the user in, or redirect to the alternative login page.
      */
     public function loginpage_hook() {
-        global $user, $SESSION;
+        global $user, $SESSION, $CFG;
 
         $redirect = optional_param('redirect', 1, PARAM_URL);
         $username = optional_param('username', '', PARAM_RAW);
@@ -121,10 +123,10 @@ class auth_plugin_jwt_sso extends auth_plugin_base {
         if(!$valid_jwt){
             if (!empty($this->config->shared_login_url)) {
                 if(isset($this->config->redirect_url_name)){
-                    $urltogo = core_login_get_return_url();
+                    $urltogo = $SESSION->wantsurl;
                     redirect($this->config->shared_login_url. "?" .$this->config->redirect_url_name . "=" . $urltogo);
                 }else{
-                    redirect($this->config->shared_login_url);
+                    redirect($this->config->shared_login_url."?" .$this->config->redirect_url_name . "=" . $CFG->wwwroot. "/my/?type=all");
                 }
             }
             return;
@@ -139,7 +141,7 @@ class auth_plugin_jwt_sso extends auth_plugin_base {
             // Redirect to the shared login URL if the user can't be logged in.
             if (!empty($this->config->shared_login_url)) {
                 if(isset($this->config->redirect_url_name)){
-                    $urltogo = core_login_get_return_url();
+                    $urltogo = $SESSION->wantsurl;
                     redirect($this->config->shared_login_url. "?" .$this->config->redirect_url_name . "=" . $urltogo);
                 }else{
                     redirect($this->config->shared_login_url);
@@ -149,7 +151,7 @@ class auth_plugin_jwt_sso extends auth_plugin_base {
     }
 
     protected function finishUserLogin($user, $incoming_url = ""){
-        global $CFG;
+        global $CFG, $SESSION;
         // JWT was not verified.
         if (($user) === false || $user ==null) {
 
@@ -157,7 +159,8 @@ class auth_plugin_jwt_sso extends auth_plugin_base {
             // priority plugin.
             if (!empty($this->config->shared_login_url)) {
                 if(isset($this->config->redirect_url_name)){
-                    $urltogo = core_login_get_return_url();
+                    //$urltogo = core_login_get_return_url();
+                    $urltogo =  $SESSION->wantsurl;
                     redirect($this->config->shared_login_url. "?" .$this->config->redirect_url_name . "=" . $urltogo);
                 }else{
                     redirect($this->config->shared_login_url);
@@ -170,7 +173,8 @@ class auth_plugin_jwt_sso extends auth_plugin_base {
         if ($user !== false && $user === null) {
             if (!empty($this->config->shared_login_url)) {
                 if(isset($this->config->redirect_url_name)){
-                    $urltogo = core_login_get_return_url();
+                    //$urltogo = core_login_get_return_url();
+                    $urltogo =  $SESSION->wantsurl;
                     redirect($this->config->shared_login_url. "?" .$this->config->redirect_url_name . "=" . $urltogo);
                 }else{
                     redirect($this->config->shared_login_url);
@@ -191,7 +195,8 @@ class auth_plugin_jwt_sso extends auth_plugin_base {
             }else{
                 try {
                     complete_user_login($user);
-                    $urltogo = core_login_get_return_url();
+                    //$urltogo = core_login_get_return_url();
+                    $urltogo =  $SESSION->wantsurl;
                     if($urltogo){
                         redirect($urltogo);
                     }else{
@@ -252,19 +257,18 @@ class auth_plugin_jwt_sso extends auth_plugin_base {
     {
         global $DB;
 
-        if($userdata && isset($userdata['username'])){
-
+        if($userdata){
             $userdata = (array)$userdata;
-            if ($this->config->userdatamapper != ""){
-                $userdata = (array)json_decode($userdata[$this->config->userdatamapper]);
-            }
-            $uniqueid = $this->config->useruniqueid;
+            /**if ($this->config->userdatamapper != ""){
+            $userdata = (array)json_decode($userdata[$this->config->userdatamapper]);
+            }**/
+            $uniqueid = $this->config->useruniquemoodleid;
 
             if(!empty($uniqueid)){
                 $userdata['uniqueid'] = $userdata[$uniqueid];
             }
 
-            $user = $DB->get_record('user', array('username' => $userdata['username']));
+            $user = $DB->get_record('user', array('username' => $userdata['uniqueid']));
 
             $newuser = false;
             if(!$user){
@@ -339,7 +343,6 @@ class auth_plugin_jwt_sso extends auth_plugin_base {
      * @return integer|bool If the cookie was valid return the id, false otherwise.
      */
     protected function verify_cookie() {
-
         if (!isset($_COOKIE[$this->config->cookie_name])) {
             return false;
         }
@@ -349,7 +352,6 @@ class auth_plugin_jwt_sso extends auth_plugin_base {
         $userdata = $this->decrypt_jwt($string);
 
         return $userdata;
-
     }
 
     /**
@@ -359,8 +361,8 @@ class auth_plugin_jwt_sso extends auth_plugin_base {
         global $USER;
 
         if ($USER->auth === $this->authtype){
-            setcookie($this->config->cookie_name, null, time() - (86400 * 30), '/', $this->config->shared_cookie_domain);
             unset($_COOKIE[$this->config->cookie_name]);
+            setcookie($this->config->cookie_name, null, time() - (86400 * 30), '/', $this->config->shared_cookie_domain);
         }
     }
 

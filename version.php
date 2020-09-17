@@ -22,7 +22,7 @@
 
 defined('MOODLE_INTERNAL') || die();
 
-$plugin->version   = 2020070801;        // The current plugin version (Date: YYYYMMDDXX)
+$plugin->version   = 2020091601;        // The current plugin version (Date: YYYYMMDDXX)
 $plugin->requires  = 2018071100;        // Requires this Moodle version
 $plugin->requires  = 2014051200;    // Requires this Moodle version. (2.7)
 $plugin->component = 'auth_jwt_sso';       // Full name of the plugin (used for diagnostics)
