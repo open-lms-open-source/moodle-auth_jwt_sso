@@ -107,6 +107,13 @@ class auth_plugin_jwt_sso extends auth_plugin_base {
             $SESSION->nologinredirect = null;
         }
 
+        if ($redirect == 0 || (isset($SESSION->nologinredirect) && !$SESSION->nologinredirect)) {
+            // Login page can redirect back to itself without parameters when there is an error message, e.g. session timeout.
+            // Remember the redirect = 0 paramater accross this redirect using this custom session var.
+            $SESSION->nologinredirect = true;
+            return;
+        }
+
         // If the username is set for the form, we will not validate or redirect.
         if (!empty($username) || isloggedin()) {
             return;
