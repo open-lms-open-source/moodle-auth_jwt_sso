@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+<libraries>
+    <library>
+        <location>/vendor/monolog/</location>
+        <name>Monolog</name>
+        <version>1.0.0</version>
+        <license>MIT</license>
+        <licenseversion>2014</licenseversion>
+    </library>
+    <library>
+        <location>/vendor/psr/</location>
+        <name>PSR Log</name>
+        <version>3.0.0</version>
+        <license>PHP Framework Interoperability Group</license>
+        <licenseversion>2012</licenseversion>
+    </library>
+</libraries>
